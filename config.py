@@ -1,7 +1,6 @@
 import json
 import os
-from dataclasses import dataclass, asdict
-from typing import Dict, Any
+from dataclasses import dataclass, asdict, field
 
 
 @dataclass
@@ -21,7 +20,7 @@ class Config:
     logs_path: str = "logs"
     movement_pattern: str = "zigzag"
     step_duration: float = 0.4
-    directions_time: DirectionsTime = DirectionsTime()
+    directions_time: DirectionsTime = field(default_factory=DirectionsTime)
     attack_delay: float = 0.5
     battle_timeout: float = 30.0
     max_stuck_seconds: float = 60.0
