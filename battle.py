@@ -20,12 +20,12 @@ class BattleManager:
         )
 
     def handle_battle_loop(self) -> bool:
-        """Ciclo completo de ataque e fechamento automático da tela de XP."""
+        """Ciclo de ataque em cascata: Tenta o 1º Golpe, depois o 2º e por fim o 3º."""
         self.logger.info("=== COMBATE DETECTADO! BLOQUEANDO MOVIMENTO ===")
         start_battle_time = time.time()
         last_fight_coords = None
 
-        # --- FASE 1: ATAQUES EM TURNO ---
+        # --- FASE 1: ATAQUES EM TURNO (SISTEMA DE 3 ATAQUES) ---
         while self.is_in_battle():
             if time.time() - start_battle_time > self.config.battle_timeout:
                 self.logger.error("Timeout de batalha atingido!")
@@ -40,14 +40,24 @@ class BattleManager:
                 self.input_ctrl.click_position(fx, fy)
                 time.sleep(0.5)
 
-                # Clica na caixa do 1º Golpe
-                self.logger.info("Executando o PRIMEIRO GOLPE...")
-                self.input_ctrl.click_position(fx - 40, fy)
-                time.sleep(0.1)
+                # --- OPÇÃO 1: Primeiro Golpe (Superior Esquerdo) ---
+                self.logger.info("Tentando o 1º GOLPE...")
                 self.input_ctrl.click_position(fx - 40, fy)
                 self.input_ctrl.press_key("1")
+                time.sleep(0.3)
+
+                # --- OPÇÃO 2: Segundo Golpe (Inferior Esquerdo) ---
+                self.logger.info("Tentando o 2º GOLPE (Fallback 1)...")
+                self.input_ctrl.click_position(fx - 40, fy + 45)
+                self.input_ctrl.press_key("2")
+                time.sleep(0.3)
+
+                # --- OPÇÃO 3: Terceiro Golpe (Superior Direito) ---
+                self.logger.info("Tentando o 3º GOLPE (Fallback 2)...")
+                self.input_ctrl.click_position(fx + 60, fy)
+                self.input_ctrl.press_key("3")
                 
-                # Aguarda a animação do golpe ser processada pelo jogo
+                # Aguarda o processamento da animação de ataque
                 time.sleep(2.5)
             else:
                 # Se está em batalha mas o FIGHT sumiu (ex: animação de ataque rolando)
@@ -57,13 +67,11 @@ class BattleManager:
         self.logger.info("Inimigo derrotado! Fechando tela de XP...")
         time.sleep(0.6)
 
-        # Combina atalhos de teclado e clique centralizado no banner de XP
         for _ in range(7):
             self.input_ctrl.press_key("space")
             self.input_ctrl.press_key("enter")
             
             if last_fight_coords:
-                # Clica no centro exato do banner inferior ("earned XP!")
                 xp_box_x = last_fight_coords[0] - 350
                 xp_box_y = last_fight_coords[1] + 15
                 self.input_ctrl.click_position(xp_box_x, xp_box_y)
