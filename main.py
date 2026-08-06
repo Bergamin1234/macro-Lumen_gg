@@ -110,7 +110,7 @@ class CLI:
             print("1 - Iniciar Macro")
             print("2 - Configurações")
             print("3 - Testar Reconhecimento de Templates")
-            print("4 - Capturar Novo Template (Região)")
+            print("4 - Capturar Novo Template (Região Visual)")
             print("5 - Sair")
             print("=======================================")
 
@@ -195,25 +195,19 @@ class CLI:
         input("\nPressione ENTER para voltar...")
 
     def capture_template_cli(self) -> None:
-        print("\n--- Ferramenta de Captura de Template ---")
-        name = input("Nome do template (ex: fight_button): ").strip()
+        print("\n--- Ferramenta de Captura Visual ---")
+        name = input("Digite o nome do template (ex: fight_button): ").strip()
         if not name:
             return
 
-        print("Aponte as coordenadas da região:")
-        try:
-            x = int(input("X inicial (topo esquerdo): "))
-            y = int(input("Y inicial (topo esquerdo): "))
-            w = int(input("Largura (width): "))
-            h = int(input("Altura (height): "))
+        print("\nAbra a tela do jogo! A captura vai iniciar em 3 segundos...")
+        time.sleep(3.0)
 
-            success = self.engine.vision.save_region_as_template(x, y, w, h, name)
-            if success:
-                print(f"Template '{name}' capturado e salvo!")
-            else:
-                print("Falha ao capturar o template.")
-        except ValueError:
-            print("Entrada inválida! Insira números inteiros.")
+        success = self.engine.vision.capture_template_interactive(name)
+        if success:
+            print(f"\n[SUCESSO] Template '{name}.png' salvo na pasta templates!")
+        else:
+            print("\n[CANCELADO] Seleção cancelada.")
 
 
 if __name__ == "__main__":
