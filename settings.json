@@ -4,7 +4,7 @@
   "confidence": 0.8,
   "templates_path": "templates",
   "logs_path": "logs",
-  "movement_pattern": "zigzag",
+  "movement_pattern": "square",
   "step_duration": 0.4,
   "directions_time": {
     "up": 0.5,
