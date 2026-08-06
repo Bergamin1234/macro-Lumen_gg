@@ -13,50 +13,63 @@ class BattleManager:
         self.logger = logging.getLogger("LumenaMacro.Battle")
 
     def is_in_battle(self) -> bool:
-        """Verifica se está na tela de batalha detectando o botão FIGHT ou o 1º ATAQUE."""
+        """Detecta se a luta está ativa pelo botão FIGHT ou pelo HP do inimigo."""
         return (
             self.vision.template_exists("fight_button") or
-            self.vision.template_exists("first_attack")
+            self.vision.template_exists("enemy_hp")
         )
 
     def handle_battle_loop(self) -> bool:
-        """Gerencia o ciclo completo do combate."""
-        self.logger.info("Combate detectado! Iniciando ações.")
+        """Ciclo completo de ataque e fechamento automático da tela de XP."""
+        self.logger.info("=== COMBATE DETECTADO! BLOQUEANDO MOVIMENTO ===")
         start_battle_time = time.time()
-        last_action_time = time.time()
+        last_fight_coords = None
 
-        while True:
-            # Proteção contra travamento
+        # --- FASE 1: ATAQUES EM TURNO ---
+        while self.is_in_battle():
             if time.time() - start_battle_time > self.config.battle_timeout:
-                self.logger.error("Timeout de batalha atingido. Forçando saída.")
-                return False
+                self.logger.error("Timeout de batalha atingido!")
+                break
 
-            # Passo 1: Clicar no botão FIGHT (Se visível)
-            if self.vision.click_template("fight_button"):
-                self.logger.info("Clicou no botão FIGHT.")
-                last_action_time = time.time()
-                time.sleep(self.config.attack_delay)
-                continue
+            fight_match = self.vision.find_template("fight_button")
+            if fight_match:
+                fx, fy = fight_match[0], fight_match[1]
+                last_fight_coords = (fx, fy)
 
-            # Passo 2: Clicar SEMPRE no Primeiro Golpe (Se visível)
-            if self.vision.click_template("first_attack"):
-                self.logger.info("Clicou no PRIMEIRO GOLPE.")
-                last_action_time = time.time()
-                time.sleep(1.5)
-                continue
-
-            # Passo 3: Se não há botões de combate, clica na tela para avançar falas/XP
-            if not self.is_in_battle():
+                self.logger.info(f"Clicando no FIGHT em ({fx}, {fy})")
+                self.input_ctrl.click_position(fx, fy)
                 time.sleep(0.5)
-                # Segunda checagem para confirmar se a batalha realmente acabou
-                if not self.is_in_battle():
-                    self.logger.info("Batalha finalizada com sucesso!")
-                    return True
 
-            # Passo 4: Se o combate travou em animação ou tela de XP, clica no centro
-            if time.time() - last_action_time > 1.2:
-                # Clica na região central/inferior para fechar caixas de texto/XP
-                self.input_ctrl.click_position(600, 500)
-                time.sleep(0.3)
+                # Clica na caixa do 1º Golpe
+                self.logger.info("Executando o PRIMEIRO GOLPE...")
+                self.input_ctrl.click_position(fx - 40, fy)
+                time.sleep(0.1)
+                self.input_ctrl.click_position(fx - 40, fy)
+                self.input_ctrl.press_key("1")
+                
+                # Aguarda a animação do golpe ser processada pelo jogo
+                time.sleep(2.5)
+            else:
+                # Se está em batalha mas o FIGHT sumiu (ex: animação de ataque rolando)
+                time.sleep(0.5)
 
-            time.sleep(0.2)
+        # --- FASE 2: LIMPEZA DA TELA DE XP E VITÓRIA ---
+        self.logger.info("Inimigo derrotado! Fechando tela de XP...")
+        time.sleep(0.6)
+
+        # Combina atalhos de teclado e clique centralizado no banner de XP
+        for _ in range(7):
+            self.input_ctrl.press_key("space")
+            self.input_ctrl.press_key("enter")
+            
+            if last_fight_coords:
+                # Clica no centro exato do banner inferior ("earned XP!")
+                xp_box_x = last_fight_coords[0] - 350
+                xp_box_y = last_fight_coords[1] + 15
+                self.input_ctrl.click_position(xp_box_x, xp_box_y)
+            
+            time.sleep(0.35)
+
+        self.logger.info("=== BATALHA FINALIZADA! RETOMANDO CAMINHADA ===")
+        time.sleep(0.5)
+        return True

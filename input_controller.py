@@ -1,9 +1,8 @@
+import ctypes
 import time
 import pyautogui
-from typing import Tuple, Optional
 
 pyautogui.FAILSAFE = True
-pyautogui.PAUSE = 0.05
 
 
 class InputController:
@@ -16,10 +15,15 @@ class InputController:
         pyautogui.keyUp(key)
 
     def click_position(self, x: int, y: int, clicks: int = 1, button: str = "left") -> None:
-        pyautogui.click(x=x, y=y, clicks=clicks, button=button)
-
-    def move_to(self, x: int, y: int) -> None:
-        pyautogui.moveTo(x, y)
+        """Realiza um clique físico no ponteiro do Windows direto na coordenada da tela."""
+        for _ in range(clicks):
+            ctypes.windll.user32.SetCursorPos(int(x), int(y))
+            time.sleep(0.05)
+            # Send Mouse Left Down (0x0002) and Left Up (0x0004)
+            ctypes.windll.user32.mouse_event(0x0002, 0, 0, 0, 0)
+            time.sleep(0.05)
+            ctypes.windll.user32.mouse_event(0x0004, 0, 0, 0, 0)
+            time.sleep(0.1)
 
     def hold_key(self, key: str) -> None:
         pyautogui.keyDown(key)

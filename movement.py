@@ -15,20 +15,24 @@ class MovementManager:
         self.step_index = 0
 
     def execute_step(self, check_interrupt: Callable[[], bool]) -> bool:
-        """Executa um passo do padrão configurado."""
+        """Executa um passo do padrão configurado entre as 5 opções disponíveis."""
         pattern = self.config.movement_pattern.lower()
 
         if pattern in ["zigzag", "zig-zag"]:
             return self._step_zigzag(check_interrupt)
-        elif pattern in ["square", "quadrado", "circle", "circulo"]:
-            return self._step_circle(check_interrupt)
+        elif pattern in ["square_large", "quadrado_grande", "square"]:
+            return self._step_square_large(check_interrupt)
+        elif pattern in ["square_small", "quadrado_pequeno"]:
+            return self._step_square_small(check_interrupt)
         elif pattern in ["random", "aleatorio"]:
             return self._step_random(check_interrupt)
+        elif pattern in ["custom", "vertical"]:
+            return self._step_custom_vertical(check_interrupt)
         else:
             return self._step_zigzag(check_interrupt)
 
     def _walk_dir(self, key: str, duration: float, check_interrupt: Callable[[], bool]) -> bool:
-        """Pressiona a tecla de movimento enviando pulsos contínuos para o navegador."""
+        """Pressiona a tecla enviando pulsos contínuos para manter o boneco correndo."""
         start_time = time.time()
         interrupted = False
 
@@ -38,7 +42,6 @@ class MovementManager:
                 if check_interrupt():
                     interrupted = True
                     break
-                # Re-envia o sinal de tecla para navegadores HTML5 que exigem repetição
                 self.input_ctrl.hold_key(key)
                 time.sleep(0.05)
         finally:
@@ -47,28 +50,47 @@ class MovementManager:
         return interrupted
 
     def _step_zigzag(self, check_interrupt: Callable[[], bool]) -> bool:
-        """Movimento alternado: Esquerda (A) <-> Direita (D)."""
+        """1. Zig-Zag: Esquerda (A) <-> Direita (D)."""
         steps = ["left", "right"]
         direction = steps[self.step_index % len(steps)]
         self.step_index += 1
         dur = getattr(self.config.directions_time, direction, self.config.step_duration)
-        self.logger.info(f"Caminhando: {direction.upper()} por {dur}s")
+        self.logger.info(f"Caminhando [Zig-Zag]: {direction.upper()} por {dur}s")
         return self._walk_dir(self._dir_to_key(direction), dur, check_interrupt)
 
-    def _step_circle(self, check_interrupt: Callable[[], bool]) -> bool:
-        """Movimento em círculo/quadrado: Cima (W) -> Direita (D) -> Baixo (S) -> Esquerda (A)."""
+    def _step_square_large(self, check_interrupt: Callable[[], bool]) -> bool:
+        """2. Quadrado Grande: Passos longos (W -> D -> S -> A)."""
         steps = ["up", "right", "down", "left"]
         direction = steps[self.step_index % len(steps)]
         self.step_index += 1
-        dur = getattr(self.config.directions_time, direction, self.config.step_duration)
-        self.logger.info(f"Caminhando em círculo: {direction.upper()} por {dur}s")
+        base_dur = getattr(self.config.directions_time, direction, self.config.step_duration)
+        dur = max(base_dur, 0.8)
+        self.logger.info(f"Caminhando [Quadrado Grande]: {direction.upper()} por {dur}s")
+        return self._walk_dir(self._dir_to_key(direction), dur, check_interrupt)
+
+    def _step_square_small(self, check_interrupt: Callable[[], bool]) -> bool:
+        """3. Quadrado Pequeno: Passos bem curtos e rápidos para trechos pequenos de mato."""
+        steps = ["up", "right", "down", "left"]
+        direction = steps[self.step_index % len(steps)]
+        self.step_index += 1
+        dur = 0.25
+        self.logger.info(f"Caminhando [Quadrado Pequeno]: {direction.upper()} por {dur}s")
         return self._walk_dir(self._dir_to_key(direction), dur, check_interrupt)
 
     def _step_random(self, check_interrupt: Callable[[], bool]) -> bool:
-        """Movimento aleatório controlado."""
+        """4. Aleatório: Direções e tempos sorteadas."""
         direction = random.choice(["up", "down", "left", "right"])
         dur = random.uniform(0.3, 0.7)
-        self.logger.info(f"Caminhando aleatório: {direction.upper()} por {dur:.1f}s")
+        self.logger.info(f"Caminhando [Aleatório]: {direction.upper()} por {dur:.2f}s")
+        return self._walk_dir(self._dir_to_key(direction), dur, check_interrupt)
+
+    def _step_custom_vertical(self, check_interrupt: Callable[[], bool]) -> bool:
+        """5. Cima / Baixo: Alternado vertical (W <-> S)."""
+        steps = ["up", "down"]
+        direction = steps[self.step_index % len(steps)]
+        self.step_index += 1
+        dur = getattr(self.config.directions_time, direction, self.config.step_duration)
+        self.logger.info(f"Caminhando [Vertical Cima/Baixo]: {direction.upper()} por {dur}s")
         return self._walk_dir(self._dir_to_key(direction), dur, check_interrupt)
 
     @staticmethod

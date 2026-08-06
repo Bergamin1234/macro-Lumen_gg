@@ -3,6 +3,7 @@ import threading
 import time
 import tkinter as tk
 from tkinter import scrolledtext, ttk
+
 from main import MacroEngine
 
 
@@ -34,13 +35,13 @@ class LumenaGUI:
         self._setup_logging()
 
     def _build_interface(self) -> None:
-        # --- Assistente Guiado (Tutorial) ---
-        frame_wizard = ttk.LabelFrame(self.root, text=" Configuração Rápida ", padding=10)
+        # --- Assistente Guiado ---
+        frame_wizard = ttk.LabelFrame(self.root, text=" Configuração de Combate ", padding=10)
         frame_wizard.pack(fill="x", padx=10, pady=5)
 
         btn_wizard = tk.Button(
             frame_wizard,
-            text="🧙 INICIAR TUTORIAL PASSO A PASSO",
+            text="🧙 INICIAR REGISTRO DE COMBATE (2 PASSOS)",
             bg="#2196F3",
             fg="white",
             font=("Arial", 10, "bold"),
@@ -49,7 +50,7 @@ class LumenaGUI:
         )
         btn_wizard.pack(fill="x")
 
-        # --- Painel de Controle ---
+        # --- Controles ---
         frame_control = ttk.LabelFrame(self.root, text=" Controles do Bot ", padding=10)
         frame_control.pack(fill="x", padx=10, pady=5)
 
@@ -64,22 +65,22 @@ class LumenaGUI:
         )
         self.btn_toggle.pack(fill="x", pady=2)
 
-        # --- Painel de Configurações ---
+        # --- Movimento ---
         frame_config = ttk.LabelFrame(self.root, text=" Opções de Movimento ", padding=10)
         frame_config.pack(fill="x", padx=10, pady=5)
 
         ttk.Label(frame_config, text="Padrão de Caminhada:").grid(row=0, column=0, sticky="w", pady=5)
         self.combo_pattern = ttk.Combobox(
             frame_config,
-            values=["zigzag", "square", "random", "custom"],
+            values=["zigzag", "square_large", "square_small", "random", "custom"],
             state="readonly",
-            width=15,
+            width=18,
         )
         self.combo_pattern.set(self.engine.config.movement_pattern)
         self.combo_pattern.grid(row=0, column=1, sticky="e", padx=10, pady=5)
         self.combo_pattern.bind("<<ComboboxSelected>>", self.change_pattern)
 
-        # --- Painel de Logs ---
+        # --- Logs ---
         frame_log = ttk.LabelFrame(self.root, text=" Log de Execução ", padding=10)
         frame_log.pack(fill="both", expand=True, padx=10, pady=5)
 
@@ -108,73 +109,60 @@ class LumenaGUI:
         self.engine.config.save_to_json()
         self.engine.logger.info(f"Padrão alterado para: '{new_pattern}'")
 
-    # --- Janela de Tutorial Passo a Passo ---
     def open_wizard(self) -> None:
         wiz = tk.Toplevel(self.root)
-        wiz.title("Assistente Passo a Passo")
-        wiz.geometry("450x320")
+        wiz.title("Passo 1: Botão FIGHT")
+        wiz.geometry("450x280")
         wiz.resizable(False, False)
         wiz.grab_set()
 
-        lbl_step = ttk.Label(wiz, text="PASSO 1 DE 2: CAPTURAR BOTÃO FIGHT", font=("Arial", 11, "bold"))
-        lbl_step.pack(pady=10)
+        lbl = ttk.Label(wiz, text="PASSO 1: CAPTURAR BOTÃO FIGHT", font=("Arial", 10, "bold"))
+        lbl.pack(pady=10)
 
-        txt_instructions = tk.Text(wiz, height=6, width=50, wrap="word", font=("Arial", 9))
-        txt_instructions.pack(pady=5, padx=10)
-        txt_instructions.insert(
-            "1.0",
-            "Entra em uma batalha no jogo Lumena.gg.\n\n"
-            "Quando a batalha começar e o botão vermelho 'FIGHT' estiver visível na tela, clique no botão abaixo.\n\n"
-            "A tela congelará em 3 segundos. Selecione o botão FIGHT com o mouse e aperte ENTER."
-        )
-        txt_instructions.config(state="disabled")
+        txt = tk.Text(wiz, height=5, width=50, wrap="word", font=("Arial", 9))
+        txt.pack(pady=5, padx=10)
+        txt.insert("1.0", "1. Mude para o jogo durante uma batalha.\n2. Quando o botão vermelho FIGHT aparecer, clique abaixo.\n3. Selecione o botão FIGHT com o mouse e aperte ENTER.")
+        txt.config(state="disabled")
 
-        def capture_step_1() -> None:
+        def cap1():
             wiz.destroy()
             threading.Thread(target=self._exec_step_1, daemon=True).start()
 
-        btn_cap = tk.Button(wiz, text="📷 CAPTURAR BOTÃO FIGHT", bg="#FF9800", fg="white", font=("Arial", 10, "bold"), command=capture_step_1)
-        btn_cap.pack(pady=15)
+        tk.Button(wiz, text="📷 CAPTURAR FIGHT", bg="#FF9800", fg="white", font=("Arial", 10, "bold"), command=cap1).pack(pady=10)
 
     def _exec_step_1(self) -> None:
-        self.engine.logger.info("Mude para o jogo! A captura do FIGHT iniciará em 3 segundos...")
+        self.engine.logger.info("Mude para o jogo! Congelando em 3s...")
         time.sleep(3.0)
         if self.engine.vision.capture_template_interactive("fight_button"):
-            self.engine.logger.info("Botão FIGHT capturado com sucesso!")
+            self.engine.logger.info("FIGHT capturado!")
             self.root.after(500, self._open_wizard_step_2)
 
     def _open_wizard_step_2(self) -> None:
         wiz = tk.Toplevel(self.root)
-        wiz.title("Assistente Passo a Passo")
-        wiz.geometry("450x320")
+        wiz.title("Passo 2: Barra de HP Inimiga")
+        wiz.geometry("450x280")
         wiz.resizable(False, False)
         wiz.grab_set()
 
-        lbl_step = ttk.Label(wiz, text="PASSO 2 DE 2: CAPTURAR PRIMEIRO GOLPE", font=("Arial", 11, "bold"))
-        lbl_step.pack(pady=10)
+        lbl = ttk.Label(wiz, text="PASSO 2: BARRA DE HP DO INIMIGO", font=("Arial", 10, "bold"))
+        lbl.pack(pady=10)
 
-        txt_instructions = tk.Text(wiz, height=6, width=50, wrap="word", font=("Arial", 9))
-        txt_instructions.pack(pady=5, padx=10)
-        txt_instructions.insert(
-            "1.0",
-            "Agora clique manualmente no botão FIGHT dentro do jogo para abrir a lista de ataques.\n\n"
-            "Quando a lista abrir (exibindo Rising Flame, etc.), clique no botão abaixo.\n\n"
-            "A tela congelará em 3 segundos. Selecione o PRIMEIRO GOLPE com o mouse e aperte ENTER."
-        )
-        txt_instructions.config(state="disabled")
+        txt = tk.Text(wiz, height=5, width=50, wrap="word", font=("Arial", 9))
+        txt.pack(pady=5, padx=10)
+        txt.insert("1.0", "1. Durante a batalha, selecione a BARRA VERDE DE HP do Pokémon inimigo (no canto superior direito da tela).\n2. Isso garante que o bot saiba que está em combate mesmo quando o menu mudar.")
+        txt.config(state="disabled")
 
-        def capture_step_2() -> None:
+        def cap2():
             wiz.destroy()
             threading.Thread(target=self._exec_step_2, daemon=True).start()
 
-        btn_cap = tk.Button(wiz, text="📷 CAPTURAR 1º GOLPE", bg="#FF9800", fg="white", font=("Arial", 10, "bold"), command=capture_step_2)
-        btn_cap.pack(pady=15)
+        tk.Button(wiz, text="📷 CAPTURAR BARRA DE HP", bg="#FF9800", fg="white", font=("Arial", 10, "bold"), command=cap2).pack(pady=10)
 
     def _exec_step_2(self) -> None:
-        self.engine.logger.info("Mude para o jogo! A captura do 1º GOLPE iniciará em 3 segundos...")
+        self.engine.logger.info("Mude para o jogo! Congelando em 3s...")
         time.sleep(3.0)
-        if self.engine.vision.capture_template_interactive("first_attack"):
-            self.engine.logger.info("Primeiro golpe capturado! O bot está 100% pronto!")
+        if self.engine.vision.capture_template_interactive("enemy_hp"):
+            self.engine.logger.info("HP Inimigo registrado! Bot pronto!")
 
 
 if __name__ == "__main__":
