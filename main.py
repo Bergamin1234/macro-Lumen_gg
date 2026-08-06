@@ -1,15 +1,15 @@
+import logging
 import os
 import sys
-import time
-import logging
 import threading
+import time
 from typing import Optional
 
+from battle import BattleManager
 from config import Config
 from input_controller import InputController
-from vision import VisionSystem
 from movement import MovementManager
-from battle import BattleManager
+from vision import VisionSystem
 
 
 def setup_logger(config: Config) -> logging.Logger:
@@ -34,6 +34,13 @@ def setup_logger(config: Config) -> logging.Logger:
     return logger
 
 
+def pyautogui_reset() -> None:
+    import pyautogui
+
+    for k in ["w", "a", "s", "d"]:
+        pyautogui.keyUp(k)
+
+
 class MacroEngine:
     def __init__(self) -> None:
         self.config = Config.load_from_json()
@@ -45,7 +52,7 @@ class MacroEngine:
         self.running = False
         self.macro_thread: Optional[threading.Thread] = None
 
-    def start_macro() -> None:
+    def start_macro(self) -> None:
         if self.running:
             print("A macro já está em execução.")
             return
@@ -55,13 +62,13 @@ class MacroEngine:
         self.macro_thread.start()
         print("\n[+] Macro iniciada! Pressione CTRL+C no terminal para parar e voltar ao menu.\n")
 
-    def stop_macro() -> None:
+    def stop_macro(self) -> None:
         self.running = False
         if self.macro_thread and self.macro_thread.is_alive():
             self.macro_thread.join(timeout=2.0)
         print("\n[-] Macro parada com sucesso.\n")
 
-    def _run_loop() -> None:
+    def _run_loop(self) -> None:
         self.logger.info("Loop principal iniciado.")
         stuck_timer = time.time()
 
@@ -91,17 +98,11 @@ class MacroEngine:
                 time.sleep(1.0)
 
 
-def pyautogui_reset() -> None:
-    import pyautogui
-    for k in ["w", "a", "s", "d"]:
-        pyautogui.keyUp(k)
-
-
 class CLI:
     def __init__(self, engine: MacroEngine) -> None:
         self.engine = engine
 
-    def show_menu() -> None:
+    def show_menu(self) -> None:
         while True:
             print("=======================================")
             print("       LUMENA.GG - MACRO AUTOMATION    ")
@@ -140,7 +141,7 @@ class CLI:
             else:
                 print("Opção inválida!")
 
-    def configure_menu() -> None:
+    def configure_menu(self) -> None:
         cfg = self.engine.config
         print("\n--- Configurações Atuais ---")
         print(f"1. Padrão de Movimento: {cfg.movement_pattern}")
@@ -182,7 +183,7 @@ class CLI:
             except ValueError:
                 print("Valor inválido.")
 
-    def test_recognition() -> None:
+    def test_recognition(self) -> None:
         print("\nTestando detecção de templates carregados...")
         self.engine.vision.load_templates()
         for tname in self.engine.vision.templates.keys():
@@ -193,7 +194,7 @@ class CLI:
                 print(f"[NÃO ENCONTRADO] '{tname}'")
         input("\nPressione ENTER para voltar...")
 
-    def capture_template_cli() -> None:
+    def capture_template_cli(self) -> None:
         print("\n--- Ferramenta de Captura de Template ---")
         name = input("Nome do template (ex: fight_button): ").strip()
         if not name:
