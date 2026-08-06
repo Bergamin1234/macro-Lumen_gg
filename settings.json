@@ -1,10 +1,10 @@
 {
   "window_name": "Lumena.gg",
-  "monitor_index": 1,
+  "monitor_index": 0,
   "confidence": 0.8,
   "templates_path": "templates",
   "logs_path": "logs",
-  "movement_pattern": "square",
+  "movement_pattern": "zigzag",
   "step_duration": 0.4,
   "directions_time": {
     "up": 0.5,

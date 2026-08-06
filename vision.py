@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import time
 from typing import Dict, Optional, Tuple
 
@@ -8,7 +9,18 @@ import numpy as np
 from config import Config
 from input_controller import InputController
 from mss import mss
-from PIL import Image
+
+# Força o Python a ler as coordenadas reais da tela sem distorção de zoom (DPI Awareness)
+if sys.platform == "win32":
+    import ctypes
+
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
 
 
 class VisionSystem:
@@ -39,8 +51,9 @@ class VisionSystem:
                     self.logger.error(f"Erro ao carregar imagem: {full_path}")
 
     def capture_screen(self) -> np.ndarray:
-        monitor = self.sct.monitors[self.config.monitor_index]
-        sct_img = self.sct.grab(monitor)
+        monitors = self.sct.monitors
+        idx = self.config.monitor_index if self.config.monitor_index < len(monitors) else 0
+        sct_img = self.sct.grab(monitors[idx])
         frame = np.array(sct_img)
         return cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
@@ -54,6 +67,10 @@ class VisionSystem:
             return None
 
         thresh = threshold if threshold is not None else self.config.confidence
+        monitors = self.sct.monitors
+        idx = self.config.monitor_index if self.config.monitor_index < len(monitors) else 0
+        mon = monitors[idx]
+
         screen = self.capture_screen()
 
         if region:
@@ -74,8 +91,9 @@ class VisionSystem:
 
         if max_val >= thresh:
             top_left = max_loc
-            center_x = top_left[0] + tw // 2 + offset_x
-            center_y = top_left[1] + th // 2 + offset_y
+            # Converte as coordenadas relativas da imagem para coordenadas absolutas da tela
+            center_x = top_left[0] + tw // 2 + offset_x + mon["left"]
+            center_y = top_left[1] + th // 2 + offset_y + mon["top"]
             return (center_x, center_y, tw, th)
 
         return None
@@ -113,23 +131,6 @@ class VisionSystem:
             return True
 
         return False
-
-    def save_region_as_template(
-        self, x: int, y: int, width: int, height: int, template_name: str
-    ) -> bool:
-        screen = self.capture_screen()
-        h, w = screen.shape[:2]
-
-        if x < 0 or y < 0 or x + width > w or y + height > h:
-            self.logger.error("Região fora dos limites da tela.")
-            return False
-
-        crop = screen[y : y + height, x : x + width]
-        file_path = os.path.join(self.config.templates_path, f"{template_name}.png")
-        cv2.imwrite(file_path, crop)
-        self.logger.info(f"Novo template salvo em: {file_path}")
-        self.load_templates()
-        return True
 
     def capture_template_interactive(self, template_name: str) -> bool:
         time.sleep(2.0)
