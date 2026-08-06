@@ -1,8 +1,8 @@
-import time
 import logging
+import time
 from config import Config
-from vision import VisionSystem
 from input_controller import InputController
+from vision import VisionSystem
 
 
 class BattleManager:
@@ -13,61 +13,50 @@ class BattleManager:
         self.logger = logging.getLogger("LumenaMacro.Battle")
 
     def is_in_battle(self) -> bool:
+        """Verifica se está na tela de batalha detectando o botão FIGHT ou o 1º ATAQUE."""
         return (
             self.vision.template_exists("fight_button") or
-            self.vision.template_exists("battle_hud") or
-            self.vision.template_exists("enemy_hp_bar")
+            self.vision.template_exists("first_attack")
         )
 
     def handle_battle_loop(self) -> bool:
-        self.logger.info("Batalha detectada! Iniciando automação de combate.")
+        """Gerencia o ciclo completo do combate."""
+        self.logger.info("Combate detectado! Iniciando ações.")
         start_battle_time = time.time()
+        last_action_time = time.time()
 
         while True:
+            # Proteção contra travamento
             if time.time() - start_battle_time > self.config.battle_timeout:
-                self.logger.error("Timeout de batalha atingido. Tentando recuperar...")
+                self.logger.error("Timeout de batalha atingido. Forçando saída.")
                 return False
 
-            if self.vision.template_exists("fight_button"):
-                self.logger.info("Menu de combate aberto. Selecionando primeiro golpe.")
-                self.vision.click_template("fight_button")
+            # Passo 1: Clicar no botão FIGHT (Se visível)
+            if self.vision.click_template("fight_button"):
+                self.logger.info("Clicou no botão FIGHT.")
+                last_action_time = time.time()
                 time.sleep(self.config.attack_delay)
+                continue
 
-                if self.vision.template_exists("move_1"):
-                    self.vision.click_template("move_1")
-                    self.logger.info("Primeiro golpe selecionado.")
-                else:
-                    self.input_ctrl.press_key("1")
-                    self.logger.info("Atalho '1' pressionado para o primeiro golpe.")
+            # Passo 2: Clicar SEMPRE no Primeiro Golpe (Se visível)
+            if self.vision.click_template("first_attack"):
+                self.logger.info("Clicou no PRIMEIRO GOLPE.")
+                last_action_time = time.time()
+                time.sleep(1.5)
+                continue
 
-                time.sleep(2.0)
-
-            if self.vision.template_exists("xp_screen") or self.vision.template_exists("victory_label"):
-                self.logger.info("Vitória detectada! Limpando telas de recompensa.")
-                self.clear_post_battle_screens()
-                return True
-
-            if self.vision.template_exists("dialog_continue"):
-                self.vision.click_template("dialog_continue")
+            # Passo 3: Se não há botões de combate, clica na tela para avançar falas/XP
+            if not self.is_in_battle():
                 time.sleep(0.5)
-
-            if not self.is_in_battle() and not self.vision.template_exists("xp_screen"):
-                time.sleep(1.0)
+                # Segunda checagem para confirmar se a batalha realmente acabou
                 if not self.is_in_battle():
-                    self.logger.info("Batalha finalizada com sucesso.")
+                    self.logger.info("Batalha finalizada com sucesso!")
                     return True
 
-            time.sleep(0.3)
+            # Passo 4: Se o combate travou em animação ou tela de XP, clica no centro
+            if time.time() - last_action_time > 1.2:
+                # Clica na região central/inferior para fechar caixas de texto/XP
+                self.input_ctrl.click_position(600, 500)
+                time.sleep(0.3)
 
-    def clear_post_battle_screens(self) -> None:
-        start_time = time.time()
-        while time.time() - start_time < 10.0:
-            clicked = False
-            for template in ["xp_screen", "continue_button", "close_button", "dialog_continue"]:
-                if self.vision.click_template(template):
-                    clicked = True
-                    time.sleep(0.5)
-
-            if not clicked and not self.is_in_battle():
-                break
-            time.sleep(0.3)
+            time.sleep(0.2)
