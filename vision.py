@@ -1,80 +1,139 @@
 import os
 import time
+import logging
 import cv2
 import numpy as np
-import mss
+from mss import mss
+from PIL import Image
 from typing import Optional, Tuple, Dict
+from config import Config
+from input_controller import InputController
 
 
 class VisionSystem:
-    def __init__(self, templates_dir: str, confidence: float = 0.8, monitor_index: int = 1) -> None:
-        self.templates_dir = templates_dir
-        self.confidence = confidence
-        self.monitor_index = monitor_index
-        self.sct = mss.mss()
+    def __init__(self, config: Config, input_ctrl: InputController) -> None:
+        self.config = config
+        self.input_ctrl = input_ctrl
+        self.logger = logging.getLogger("LumenaMacro.Vision")
+        self.sct = mss()
         self.templates: Dict[str, np.ndarray] = {}
         self.load_templates()
 
     def load_templates(self) -> None:
-        self.templates.clear()
-        if not os.path.exists(self.templates_dir):
-            os.makedirs(self.templates_dir, exist_ok=True)
+        path = self.config.templates_path
+        if not os.path.exists(path):
+            os.makedirs(path)
+            self.logger.warning(f"Diretório '{path}' criado. Adicione os templates em PNG.")
             return
 
-        for filename in os.listdir(self.templates_dir):
-            if filename.lower().endswith((".png", ".jpg", ".jpeg")):
-                path = os.path.join(self.templates_dir, filename)
-                img = cv2.imread(path, cv2.IMREAD_COLOR)
-                if img is not None:
-                    self.templates[filename] = img
+        for filename in os.listdir(path):
+            if filename.endswith(".png"):
+                name = os.path.splitext(filename)[0]
+                full_path = os.path.join(path, filename)
+                template = cv2.imread(full_path, cv2.IMREAD_COLOR)
+                if template is not None:
+                    self.templates[name] = template
+                    self.logger.info(f"Template '{name}' carregado com sucesso.")
+                else:
+                    self.logger.error(f"Erro ao carregar imagem: {full_path}")
 
-    def get_screenshot(self) -> np.ndarray:
-        monitor = self.sct.monitors[self.monitor_index]
+    def capture_screen() -> np.ndarray:
+        monitor = self.sct.monitors[self.config.monitor_index]
         sct_img = self.sct.grab(monitor)
         frame = np.array(sct_img)
         return cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
     def find_template(
-        self, 
-        template_name: str, 
-        screenshot: Optional[np.ndarray] = None, 
-        threshold: Optional[float] = None
+        self,
+        template_name: str,
+        threshold: Optional[float] = None,
+        region: Optional[Tuple[int, int, int, int]] = None
     ) -> Optional[Tuple[int, int, int, int]]:
-        if threshold is None:
-            threshold = self.confidence
-
         if template_name not in self.templates:
             return None
 
+        thresh = threshold if threshold is not None else self.config.confidence
+        screen = self.capture_screen()
+
+        if region:
+            rx, ry, rw, rh = region
+            screen = screen[ry:ry+rh, rx:rx+rw]
+            offset_x, offset_y = rx, ry
+        else:
+            offset_x, offset_y = 0, 0
+
         template = self.templates[template_name]
-        if screenshot is None:
-            screenshot = self.get_screenshot()
+        th, tw = template.shape[:2]
 
-        res = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
-        _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        if screen.shape[0] < th or screen.shape[1] < tw:
+            return None
 
-        if max_val >= threshold:
-            h, w = template.shape[:2]
-            return (max_loc[0], max_loc[1], w, h)
+        result = cv2.matchTemplate(screen, template, cv2.TM_CCOEFF_NORMED)
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+
+        if max_val >= thresh:
+            top_left = max_loc
+            center_x = top_left[0] + tw // 2 + offset_x
+            center_y = top_left[1] + th // 2 + offset_y
+            return (center_x, center_y, tw, th)
+
         return None
 
     def template_exists(self, template_name: str, threshold: Optional[float] = None) -> bool:
         return self.find_template(template_name, threshold=threshold) is not None
 
     def wait_template(
-        self, 
-        template_name: str, 
-        timeout: float = 10.0, 
+        self,
+        template_name: str,
+        timeout: float = 10.0,
+        threshold: Optional[float] = None,
         check_interval: float = 0.2
     ) -> Optional[Tuple[int, int, int, int]]:
         start_time = time.time()
         while time.time() - start_time < timeout:
-            location = self.find_template(template_name)
-            if location:
-                return location
+            res = self.find_template(template_name, threshold)
+            if res is not None:
+                return res
             time.sleep(check_interval)
         return None
 
-    def get_center_coords(self, match_box: Tuple[int, int, int, int]) -> Tuple[int, int]:
-        x, y, w, h = match_box
-        return (x + w // 2, y + h // 2)
+    def click_template(
+        self,
+        template_name: str,
+        threshold: Optional[float] = None,
+        timeout: float = 0.0
+    ) -> bool:
+        if timeout > 0:
+            match = self.wait_template(template_name, timeout=timeout, threshold=threshold)
+        else:
+            match = self.find_template(template_name, threshold=threshold)
+
+        if match:
+            x, y, _, _ = match
+            self.input_ctrl.click_position(x, y)
+            self.logger.info(f"Clique realizado no template '{template_name}' em ({x}, {y})")
+            return True
+
+        return False
+
+    def save_region_as_template(
+        self,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        template_name: str
+    ) -> bool:
+        screen = self.capture_screen()
+        h, w = screen.shape[:2]
+
+        if x < 0 or y < 0 or x + width > w or y + height > h:
+            self.logger.error("Região fora dos limites da tela.")
+            return False
+
+        crop = screen[y:y+height, x:x+width]
+        file_path = os.path.join(self.config.templates_path, f"{template_name}.png")
+        cv2.imwrite(file_path, crop)
+        self.logger.info(f"Novo template salvo em: {file_path}")
+        self.load_templates()
+        return True

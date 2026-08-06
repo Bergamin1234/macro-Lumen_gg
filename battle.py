@@ -5,58 +5,69 @@ from vision import VisionSystem
 from input_controller import InputController
 
 
-class BattleController:
+class BattleManager:
     def __init__(self, config: Config, vision: VisionSystem, input_ctrl: InputController) -> None:
         self.config = config
         self.vision = vision
         self.input_ctrl = input_ctrl
-        self.logger = logging.getLogger("LumenaMacro")
+        self.logger = logging.getLogger("LumenaMacro.Battle")
 
-    def in_battle(self) -> bool:
+    def is_in_battle() -> bool:
         return (
-            self.vision.template_exists("fight_button.png") or 
-            self.vision.template_exists("battle_hud.png")
+            self.vision.template_exists("fight_button") or
+            self.vision.template_exists("battle_hud") or
+            self.vision.template_exists("enemy_hp_bar")
         )
 
-    def handle_battle(self) -> bool:
-        self.logger.info("Batalha detectada! Iniciando sequência de combate.")
-        start_time = time.time()
+    def handle_battle_loop() -> bool:
+        self.logger.info("Batalha detectada! Iniciando automação de combate.")
+        start_battle_time = time.time()
 
-        while time.time() - start_time < self.config.battle_timeout:
-            fight_loc = self.vision.wait_template("fight_button.png", timeout=3.0)
-            if fight_loc:
-                cx, cy = self.vision.get_center_coords(fight_loc)
-                self.input_ctrl.click(cx, cy)
-                self.logger.info("Menu 'Fight' clicado.")
-                time.sleep(0.5)
+        while True:
+            if time.time() - start_battle_time > self.config.battle_timeout:
+                self.logger.error("Timeout de batalha atingido. Tentando recuperar...")
+                return False
 
-                move_loc = self.vision.wait_template("first_move.png", timeout=2.0)
-                if move_loc:
-                    mx, my = self.vision.get_center_coords(move_loc)
-                    self.input_ctrl.click(mx, my)
-                    self.logger.info("Primeiro golpe ativado.")
+            if self.vision.template_exists("fight_button"):
+                self.logger.info("Menu de combate aberto. Selecionando primeiro golpe.")
+                self.vision.click_template("fight_button")
+                time.sleep(self.config.attack_delay)
+
+                if self.vision.template_exists("move_1"):
+                    self.vision.click_template("move_1")
+                    self.logger.info("Primeiro golpe selecionado.")
                 else:
-                    self.input_ctrl.click(cx, cy)
+                    self.input_ctrl.press_key("1")
+                    self.logger.info("Atalho '1' pressionado para o primeiro golpe.")
 
-            xp_loc = self.vision.find_template("xp_screen.png")
-            if xp_loc:
-                cx, cy = self.vision.get_center_coords(xp_loc)
-                self.input_ctrl.click(cx, cy)
-                self.logger.info("Tela de Experiência/Recompensa fechada.")
+                time.sleep(2.0)
+
+            if self.vision.template_exists("xp_screen") or self.vision.template_exists("victory_label"):
+                self.logger.info("Vitória detectada! Limpando telas de recompensa.")
+                self.clear_post_battle_screens()
+                return True
+
+            if self.vision.template_exists("dialog_continue"):
+                self.vision.click_template("dialog_continue")
                 time.sleep(0.5)
 
-            close_loc = self.vision.find_template("close_battle.png")
-            if close_loc:
-                cx, cy = self.vision.get_center_coords(close_loc)
-                self.input_ctrl.click(cx, cy)
-                self.logger.info("Batalha finalizada via botão de fechamento.")
-                return True
+            if not self.is_in_battle() and not self.vision.template_exists("xp_screen"):
+                time.sleep(1.0)
+                if not self.is_in_battle():
+                    self.logger.info("Batalha finalizada com sucesso.")
+                    return True
 
-            if not self.in_battle() and not self.vision.template_exists("xp_screen.png"):
-                self.logger.info("Batalha concluída com sucesso. Retornando ao mapa.")
-                return True
+            time.sleep(0.3)
 
-            time.sleep(self.config.attack_delay)
+    def clear_post_battle_screens() -> None:
+        start_time = time.time()
+        while time.time() - start_time < 10.0:
+            clicked = False
+            for template in ["xp_screen", "continue_button", "close_button", "dialog_continue"]:
+                if self.vision.click_template(template):
+                    clicked = True
+                    time.sleep(0.5)
 
-        self.logger.error("Timeout de batalha excedido. Retornando controle ao loop principal.")
-        return False
+            if not clicked and not self.is_in_battle():
+                break
+            time.sleep(0.3)

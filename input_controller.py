@@ -1,29 +1,28 @@
 import time
-import random
 import pyautogui
-from typing import Tuple
+from typing import Tuple, Optional
 
 pyautogui.FAILSAFE = True
+pyautogui.PAUSE = 0.05
 
 
 class InputController:
-    def __init__(self, key_delay: float = 0.05) -> None:
-        self.key_delay = key_delay
+    def __init__(self) -> None:
+        pass
 
     def press_key(self, key: str, duration: float = 0.1) -> None:
         pyautogui.keyDown(key)
         time.sleep(duration)
         pyautogui.keyUp(key)
-        time.sleep(self.key_delay)
 
-    def click(self, x: int, y: int, delay: float = 0.1) -> None:
-        jitter_x = x + random.randint(-2, 2)
-        jitter_y = y + random.randint(-2, 2)
-        pyautogui.click(x=jitter_x, y=jitter_y)
-        time.sleep(delay)
+    def click_position(self, x: int, y: int, clicks: int = 1, button: str = "left") -> None:
+        pyautogui.click(x=x, y=y, clicks=clicks, button=button)
 
-    def click_relative(self, base_box: Tuple[int, int, int, int], offset_x: int = 0, offset_y: int = 0) -> None:
-        x, y, w, h = base_box
-        center_x = x + (w // 2) + offset_x
-        center_y = y + (h // 2) + offset_y
-        self.click(center_x, center_y)
+    def move_to(self, x: int, y: int) -> None:
+        pyautogui.moveTo(x, y)
+
+    def hold_key(self, key: str) -> None:
+        pyautogui.keyDown(key)
+
+    def release_key(self, key: str) -> None:
+        pyautogui.keyUp(key)

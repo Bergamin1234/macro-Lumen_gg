@@ -1,17 +1,18 @@
 {
-  "window_title": "Lumena.gg",
+  "window_name": "Lumena.gg",
+  "monitor_index": 1,
   "confidence": 0.8,
-  "templates_dir": "templates",
-  "logs_dir": "logs",
+  "templates_path": "templates",
+  "logs_path": "logs",
   "movement_pattern": "zigzag",
-  "step_duration": 0.35,
-  "battle_timeout": 35.0,
-  "attack_delay": 0.8,
-  "monitor": 1,
-  "keys": {
-    "up": "w",
-    "down": "s",
-    "left": "a",
-    "right": "d"
-  }
+  "step_duration": 0.4,
+  "directions_time": {
+    "up": 0.5,
+    "down": 0.5,
+    "left": 0.5,
+    "right": 0.5
+  },
+  "attack_delay": 0.5,
+  "battle_timeout": 30.0,
+  "max_stuck_seconds": 60.0
 }

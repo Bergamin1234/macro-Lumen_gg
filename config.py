@@ -1,29 +1,30 @@
 import json
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, asdict
 from typing import Dict, Any
 
 
 @dataclass
-class KeyBindings:
-    up: str = "w"
-    down: str = "s"
-    left: str = "a"
-    right: str = "d"
+class DirectionsTime:
+    up: float = 0.5
+    down: float = 0.5
+    left: float = 0.5
+    right: float = 0.5
 
 
 @dataclass
 class Config:
-    window_title: str = "Lumena.gg"
+    window_name: str = "Lumena.gg"
+    monitor_index: int = 1
     confidence: float = 0.8
-    templates_dir: str = "templates"
-    logs_dir: str = "logs"
+    templates_path: str = "templates"
+    logs_path: str = "logs"
     movement_pattern: str = "zigzag"
-    step_duration: float = 0.35
-    battle_timeout: float = 35.0
-    attack_delay: float = 0.8
-    monitor: int = 1
-    keys: KeyBindings = field(default_factory=KeyBindings)
+    step_duration: float = 0.4
+    directions_time: DirectionsTime = DirectionsTime()
+    attack_delay: float = 0.5
+    battle_timeout: float = 30.0
+    max_stuck_seconds: float = 60.0
 
     @classmethod
     def load_from_json(cls, filepath: str = "settings.json") -> "Config":
@@ -33,29 +34,14 @@ class Config:
             return config
 
         with open(filepath, "r", encoding="utf-8") as f:
-            data: Dict[str, Any] = json.load(f)
+            data = json.load(f)
 
-        keys_data = data.pop("keys", {})
-        keys = KeyBindings(**keys_data)
-        return cls(keys=keys, **data)
+        if "directions_time" in data and isinstance(data["directions_time"], dict):
+            data["directions_time"] = DirectionsTime(**data["directions_time"])
+
+        return cls(**data)
 
     def save_to_json(self, filepath: str = "settings.json") -> None:
-        data = {
-            "window_title": self.window_title,
-            "confidence": self.confidence,
-            "templates_dir": self.templates_dir,
-            "logs_dir": self.logs_dir,
-            "movement_pattern": self.movement_pattern,
-            "step_duration": self.step_duration,
-            "battle_timeout": self.battle_timeout,
-            "attack_delay": self.attack_delay,
-            "monitor": self.monitor,
-            "keys": {
-                "up": self.keys.up,
-                "down": self.keys.down,
-                "left": self.keys.left,
-                "right": self.keys.right
-            }
-        }
+        data = asdict(self)
         with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+            json.dump(data, f, indent=2, ensure_ascii=False)
