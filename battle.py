@@ -12,14 +12,14 @@ class BattleManager:
         self.input_ctrl = input_ctrl
         self.logger = logging.getLogger("LumenaMacro.Battle")
 
-    def is_in_battle() -> bool:
+    def is_in_battle(self) -> bool:
         return (
             self.vision.template_exists("fight_button") or
             self.vision.template_exists("battle_hud") or
             self.vision.template_exists("enemy_hp_bar")
         )
 
-    def handle_battle_loop() -> bool:
+    def handle_battle_loop(self) -> bool:
         self.logger.info("Batalha detectada! Iniciando automação de combate.")
         start_battle_time = time.time()
 
@@ -59,7 +59,7 @@ class BattleManager:
 
             time.sleep(0.3)
 
-    def clear_post_battle_screens() -> None:
+    def clear_post_battle_screens(self) -> None:
         start_time = time.time()
         while time.time() - start_time < 10.0:
             clicked = False

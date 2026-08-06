@@ -37,7 +37,8 @@ class VisionSystem:
                 else:
                     self.logger.error(f"Erro ao carregar imagem: {full_path}")
 
-    def capture_screen(self) -> np.ndarray:        monitor = self.sct.monitors[self.config.monitor_index]
+    def capture_screen(self) -> np.ndarray:
+        monitor = self.sct.monitors[self.config.monitor_index]
         sct_img = self.sct.grab(monitor)
         frame = np.array(sct_img)
         return cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
